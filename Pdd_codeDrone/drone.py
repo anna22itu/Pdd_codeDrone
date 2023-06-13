@@ -1,128 +1,128 @@
 import serial
+from dronekit import connect, VehicleMode
+from pymavlink import mavutil
 import time
-from dronekit import connect, VehicleMode, LocationGlobalRelative
 
-# Conecta con el vehículo (drone)
-vehicle = connect('tcp:127.0.0.1:5760', wait_ready=True)
 
-# Configuración del puerto serial
-port = 'COM5'  # Cambia el número del puerto según tu configuración
-baud_rate = 57600  # La velocidad de transmisión debe coincidir con la configuración del dispositivo
+
+# Conecta con el vehiculo (drone)
+#vehicle = connect("tcp:172.20.10.2:5762", wait_ready=True)
+vehicle = connect('/dev/ttyAMA1' , baud = 57600,wait_ready=True)
+# Configuracion del puerto serial
+port = '/dev/ttyUSB0'  
+baud_rate = 57600  
 
 # Inicializar el objeto Serial
 ser = serial.Serial(port, baud_rate)
 
-"""
-0 --> parado
-1 --> derecha
-2 --> izquierda
-5 --> hacia delante
-4 --> hacia atrás
-8 --> yaw 
-10 -- land
-"""
+print('//////////////Programa Iniciado////////////////////// \n')
 
-pitch_desired = 0.1  
-roll_desired = 0.1
-yaw_desired = 0.1
+# Arma el vehiculo
+vehicle.mode = VehicleMode("STABILIZE")
+#vehicle.armed = True
+takeoff = False
 
-while not vehicle.is_armable:
-    print('Esperando a que el vehículo sea armable...')
-    time.sleep(1)
+def send_ned_velocity(velocity_x, velocity_y, velocity_z, duration):
+    """
+    Move vehicle in direction based on specified velocity vectors.
+    """
+    msg = vehicle.message_factory.set_position_target_local_ned_encode(
+        0,       # time_boot_ms (not used)
+        0, 0,    # target system, target component
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED, # frame
+        0b0000111111000111, # type_mask (only speeds enabled)
+        0, 0, 0, # x, y, z positions (not used)
+        velocity_x, velocity_y, velocity_z, # x, y, z velocity in m/s
+        0, 0, 0, # x, y, z acceleration (not supported yet, ignored in GCS_Mavlink)
+        0, 0)    # yaw, yaw_rate (not supported yet, ignored in GCS_Mavlink)
+        
+    
+    vehicle.send_mavlink(msg)
+    
+    
 
 
-# Arma el vehículo
-vehicle.mode = VehicleMode("GUIDED")
-vehicle.armed = True
 
 # Leer datos del puerto serial y mostrarlos por pantalla
 while True:
     try:
-        # Leer una línea de datos del puerto serial
-        line = ser.read().decode('ascii')
-
-        # Mostrar la línea de datos por pantalla
+        # Leer una linea de datos del puerto serial
+        line = ser.read().decode('utf-8')
+        # Mostrar la linea de datos por pantalla
         print(line)
+        while takeoff != True:
+            line = ser.read().decode('utf-8')
+            if line == "6":
+                vehicle.armed = True
+                print("----------------ARMED-----------------")
+                time.sleep(3)
+                vehicle.simple_takeoff(5)
+                takeoff = True
+                print("----------------DESPEGANDO-----------------")
+                time.sleep(5)
 
-        if line == "0":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch,
-                vehicle.attitude.roll
-            )
+        if takeoff == True:
+            #vehicle.armed = True
+            if line == "1": #derecha
+                SOUTH=1
+                UP=0   
+                DURATION = 0.1
 
-        if line ==  "1":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+                #Fly south and up.
+                send_ned_velocity(SOUTH,0,0,DURATION)
 
-        if line ==  "2":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+            if line == "2": #izq
+                SOUTH=-1
+                UP=0   
+                DURATION = 0.1
 
-        if line ==  "4":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+                send_ned_velocity(SOUTH,0,0,DURATION)
 
-        if line ==  "5":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+            if line == "3": #adelante
+                EAST=1
+                UP=0   
+                DURATION = 0.1
 
-        if line == "6":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+                #Fly south and up.
+                send_ned_velocity(0,EAST,0,DURATION)
+                
 
-        if line == "8":
-            # Envía el comando de control de vuelo al vehículo
-            vehicle.simple_goto(
-                vehicle.location.global_relative_frame,
-                vehicle.attitude.yaw,
-                vehicle.attitude.pitch + pitch_desired,
-                vehicle.attitude.roll
-            )
+            if line == "4": #atras
+                EAST=-1
+                UP=0   
+                DURATION = 0.1
 
-        if line == "10":
-            vehicle.mode = VehicleMode("LAND")
+                #Fly south and up.
+                send_ned_velocity(0,EAST,0,DURATION)
+                
+            if line == "9":
+                UP=-0.2   
+                DURATION = 0.1
 
-    except KeyboardInterrupt:
+                #Fly south and up.
+                send_ned_velocity(0,0,UP,DURATION)
+
+            if line == "8":
+                UP=0.2   
+                DURATION = 0.1
+
+                #Fly south and up.
+                send_ned_velocity(0,0,UP,DURATION)
+           
+
+    except:
+        print('ERROR EN EL CODIGO')
         # Detener el bucle si se presiona Ctrl + C
-        # Aterriza el vehículo
+        # Aterriza el vehiculo
         vehicle.mode = VehicleMode("LAND")
         break
 
-
-# Desarma el vehículo
+# Desarma el vehiculo
 vehicle.armed = False
-
-# Cierra la conexión con el vehículo
+print("----------------FINISHED-----------------")
+# Cierra la conexion con el vehiculo
 vehicle.close()
-# Cerrar la conexión del puerto serial
+# Cerrar la conexion del puerto serial
 ser.close()
 
 
